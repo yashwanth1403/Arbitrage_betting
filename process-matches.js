@@ -4,33 +4,35 @@ const path = require("path");
 const { fetch1xBetData } = require("./1xBet.js");
 const { fetchMostBetData } = require("./mostbet.js");
 const arbitrageFunctions = require("./arbitrage-functions.js");
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 require("dotenv").config();
 
-// Initialize Resend for email notifications
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+// Create the email transporter
+let transporter = null;
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter = nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+  console.log("Email transporter configured successfully");
+} else {
+  console.log(
+    "Email credentials not provided. Email notifications will be disabled."
+  );
+}
 
 // Use the persistent data directory if available (for Railway deployment)
 const dataDir = process.env.NODE_ENV === "production" ? "/data" : ".";
 
-// Create the arbitrage opportunities file with initial structure
-const timestamp = new Date().toISOString().replace(/:/g, "-");
-const outputFile = path.join(dataDir, `arbitrage-opportunities.json`);
-
-// Check if the file exists, if not create it with initial structure
-if (!fs.existsSync(outputFile)) {
-  fs.writeFileSync(outputFile, JSON.stringify([], null, 2));
-  console.log(`Created new file: ${outputFile}`);
-} else {
-  console.log(`Using existing file: ${outputFile}`);
-}
-
 // Function to send email notifications when arbitrage opportunities are found
 async function sendArbitrageEmail(opportunity) {
-  if (!resend) {
-    console.log("Resend API key not configured. Skipping email notification.");
+  if (!transporter) {
+    console.log(
+      "Email transporter not configured. Skipping email notification."
+    );
     return false;
   }
 
@@ -82,23 +84,20 @@ async function sendArbitrageEmail(opportunity) {
       <p>Time Detected: ${new Date().toLocaleString()}</p>
     `;
 
-    // Send the email notification to multiple recipients
-    const { data, error } = await resend.emails.send({
-      from: "Acme <onboarding@resend.dev>",
+    // Set up email data
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
       to: [
-        process.env.NOTIFICATION_EMAIL || "your-email@example.com",
+        process.env.NOTIFICATION_EMAIL,
         "gangireddyharshavardhan30@gmail.com",
-      ],
+      ].join(","),
       subject: `Arbitrage Alert: ${opportunity.homeTeam} vs ${opportunity.awayTeam} (${sortedOpportunities[0].profitPercent.toFixed(2)}% profit)`,
       html: htmlContent,
-    });
+    };
 
-    if (error) {
-      console.error(`Error sending email notification: ${error.message}`);
-      return false;
-    }
-
-    console.log(`Email notification sent successfully: ${data.id}`);
+    // Send the email
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Email notification sent successfully: ${info.messageId}`);
     return true;
   } catch (error) {
     console.error(`Exception sending email notification: ${error.message}`);
@@ -130,33 +129,49 @@ async function processAllMatches() {
     // Create an array to store all arbitrage opportunities
     const allArbitrageOpportunities = [];
 
+    // Reduce log verbosity by logging only every 5th match in detail
+    const logVerbose = matchingMatches.length <= 20;
+
     // Process each match
     for (let i = 0; i < matchingMatches.length; i++) {
       const match = matchingMatches[i];
+      const matchNumber = i + 1;
+
+      // Only log detailed info for the first match, every 5th match, or the last match when processing many matches
+      const shouldLogDetailed =
+        logVerbose ||
+        matchNumber === 1 ||
+        matchNumber % 5 === 0 ||
+        matchNumber === matchingMatches.length;
 
       // Get the match IDs
       const mostbetMatchId = match.mostbet.match_id;
       const melbet1xbetMatchId = match.melbet.match_id;
 
-      console.log(
-        `\n[${i + 1}/${matchingMatches.length}] Processing match: ${
-          match.mostbet.home_team
-        } vs ${match.mostbet.away_team}`
-      );
-      console.log(
-        `Mostbet ID: ${mostbetMatchId}, Melbet/1xBet ID: ${melbet1xbetMatchId}`
-      );
+      if (shouldLogDetailed) {
+        console.log(
+          `\n[${matchNumber}/${matchingMatches.length}] Processing match: ${
+            match.mostbet.home_team
+          } vs ${match.mostbet.away_team}`
+        );
+        console.log(
+          `Mostbet ID: ${mostbetMatchId}, Melbet/1xBet ID: ${melbet1xbetMatchId}`
+        );
+      } else {
+        // Simple progress indicator
+        process.stdout.write(`.`);
+        if (matchNumber % 50 === 0) process.stdout.write(`${matchNumber}\n`);
+      }
 
       try {
         // Fetch odds data from both bookmakers
-        console.log("Fetching odds from Mostbet...");
+        if (shouldLogDetailed) console.log("Fetching odds from bookmakers...");
         const mostbetData = await fetchMostBetData(mostbetMatchId);
-
-        console.log("Fetching odds from 1xBet...");
         const data1xbet = await fetch1xBetData(melbet1xbetMatchId);
 
         if (mostbetData.success && data1xbet.success) {
-          console.log("Successfully fetched odds from both bookmakers");
+          if (shouldLogDetailed)
+            console.log("Successfully fetched odds from both bookmakers");
 
           // Find arbitrage opportunities
           const arbitrageOpportunities = findArbitrageOpportunities(
@@ -180,18 +195,15 @@ async function processAllMatches() {
 
             allArbitrageOpportunities.push(matchWithArbitrage);
             console.log(
-              `Found ${arbitrageOpportunities.length} arbitrage opportunities for this match!`
+              `Found ${arbitrageOpportunities.length} arbitrage opportunities for match ${matchNumber}: ${match.mostbet.home_team} vs ${match.mostbet.away_team}`
             );
-
-            // Immediately write this match's opportunities to the file
-            appendArbitrageOpportunity(outputFile, matchWithArbitrage);
 
             // Send email notification about this opportunity
             await sendArbitrageEmail(matchWithArbitrage);
-          } else {
+          } else if (shouldLogDetailed) {
             console.log("No arbitrage opportunities found for this match");
           }
-        } else {
+        } else if (shouldLogDetailed) {
           console.log("Failed to fetch odds from one or both bookmakers");
         }
       } catch (error) {
@@ -204,6 +216,8 @@ async function processAllMatches() {
       // Add a small delay between requests to avoid rate limiting
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
+
+    console.log("\n"); // Ensure we start on a new line after progress dots
 
     // Print summary
     console.log("\n=== ARBITRAGE OPPORTUNITIES SUMMARY ===");
@@ -255,26 +269,6 @@ async function processAllMatches() {
     }
   } catch (error) {
     console.error("Error processing matches:", error);
-  }
-}
-
-// Function to append a new arbitrage opportunity to the file
-function appendArbitrageOpportunity(filename, opportunity) {
-  try {
-    // Read current data
-    const currentData = JSON.parse(fs.readFileSync(filename, "utf8"));
-
-    // Add new opportunity
-    currentData.push(opportunity);
-
-    // Write updated data back to file
-    fs.writeFileSync(filename, JSON.stringify(currentData, null, 2));
-
-    console.log(
-      `Arbitrage opportunity for ${opportunity.homeTeam} vs ${opportunity.awayTeam} written to ${filename}`
-    );
-  } catch (error) {
-    console.error(`Error appending to arbitrage file: ${error.message}`);
   }
 }
 

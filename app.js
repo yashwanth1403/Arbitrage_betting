@@ -58,7 +58,7 @@ function executeCommand(command, description) {
   return new Promise((resolve, reject) => {
     log(`Starting: ${description}`);
 
-    exec(command, (error, stdout, stderr) => {
+    exec(command, { maxBuffer: 1024 * 1024 * 50 }, (error, stdout, stderr) => {
       if (error) {
         log(`Error executing ${description}: ${error.message}`);
         return resolve({

@@ -1,4 +1,3 @@
-const fs = require("fs");
 const axios = require("axios");
 
 /**
@@ -67,11 +66,6 @@ async function fetchMostbetData() {
     }
 
     // Save matches to JSON file
-    fs.writeFileSync(
-      "mostbet_matches.json",
-      JSON.stringify(allMatches, null, 2),
-      "utf8"
-    );
     console.log(`Total matches found: ${allMatches.length}`);
     console.log("Matches saved to mostbet_matches.json");
   } catch (error) {
