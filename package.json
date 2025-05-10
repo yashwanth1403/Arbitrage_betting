@@ -1,0 +1,27 @@
+{
+  "name": "arbitrage-fetcher",
+  "version": "1.0.0",
+  "description": "Arbitrage finder with API endpoints for sports betting",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "cron": "node cron-scheduler.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "dotenv": "^16.5.0",
+    "express": "^4.18.2",
+    "fs": "0.0.1-security",
+    "node-cron": "^3.0.3",
+    "resend": "^4.5.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "",
+  "license": "ISC"
+}

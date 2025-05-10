@@ -1,0 +1,29 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm install"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 10
+
+[nixpacks]
+nodeVersion = "18"
+
+# Increase memory for longer-running processes
+[[services.compute]]
+memory = "512MB"
+cpu = "100%"
+
+# Persistence for data storage
+[[services.volumes]]
+mountPath = "/data"
+volumeName = "arbitrage-data"
+
+# Port configuration
+[[services.ports]]
+port = "3000"
+protocol = "http"
+force_https = true 

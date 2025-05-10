@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "site": "mostbet",
+  "matchDetails": {
+    "homeTeam": "University Johannesburg (w)",
+    "awayTeam": "Copper Belts (w)",
+    "league": "Women. Super League",
+    "matchTime": "10/5/2025, 6:30:00 pm"
+  },
+  "odds": {
+    "1X2": {
+      "W1": 1.77,
+      "X": 3.45,
+      "W2": 4.5
+    },
+    "Double Chance": {
+      "12": 1.27,
+      "1X": 1.17,
+      "X2": 1.95
+    },
+    "Handicap": {
+      "University Johannesburg (w) (-1.0)": 2.4,
+      "Copper Belts (w) (+1.0)": 1.5
+    },
+    "Total": {
+      "Total Over (2.5)": 2.05,
+      "Total Under (2.5)": 1.68
+    }
+  }
+}
