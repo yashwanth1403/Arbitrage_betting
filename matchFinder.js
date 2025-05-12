@@ -173,16 +173,75 @@ async function fetchMostbetMatches() {
     "Sec-Fetch-Site": "same-origin",
   };
 
+  // Define alternate Mostbet domains to try if the main one fails
+  const mostbetDomains = [
+    "mostbet-in62.com",
+    "mostbet.com",
+    "mostbet-india.com",
+    "mostbet-in.com",
+  ];
+
+  let currentDomainIndex = 0;
+  let successfulDomain = mostbetDomains[0]; // Default to first domain
+
   try {
     // Continue fetching until no more matches are found
     while (true) {
       console.log(`Fetching matches with offset: ${offset}`);
 
-      // Construct the API URL with the current offset
-      const url = `https://mostbet-in62.com/api/v3/user/line/list?t[]=1&lc[]=1&um=12&ss=all&l=20&of=${offset}&ltr=0`;
+      let retryCount = 0;
+      let response = null;
+      let lastError = null;
 
-      // Fetch data from the API
-      const response = await axios.get(url, { headers });
+      // Try up to 3 times with different domains if needed
+      while (retryCount < 3 && !response) {
+        try {
+          // Construct the API URL with the current offset and domain
+          const domain = mostbetDomains[currentDomainIndex];
+          const url = `https://${domain}/api/v3/user/line/list?t[]=1&lc[]=1&um=12&ss=all&l=20&of=${offset}&ltr=0`;
+
+          console.log(`Attempt ${retryCount + 1}: Using domain ${domain}`);
+
+          // Fetch data from the API
+          response = await axios.get(url, {
+            headers,
+            timeout: 10000, // 10 second timeout
+          });
+
+          // If we get here, the request was successful
+          successfulDomain = domain;
+          console.log(`Successfully fetched data from ${domain}`);
+        } catch (error) {
+          lastError = error;
+
+          // Handle 451 error (Unavailable for Legal Reasons)
+          if (error.response && error.response.status === 451) {
+            console.log(
+              `Domain ${mostbetDomains[currentDomainIndex]} returned 451 error (geo-restricted). Trying next domain...`
+            );
+            // Try next domain
+            currentDomainIndex =
+              (currentDomainIndex + 1) % mostbetDomains.length;
+          } else {
+            console.error(
+              `Error fetching from ${mostbetDomains[currentDomainIndex]}: ${error.message}`
+            );
+          }
+
+          retryCount++;
+
+          // Wait before retrying to avoid overwhelming the server
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
+
+      // If all retries failed, break the loop
+      if (!response) {
+        console.error(
+          `All domains failed after 3 retries. Last error: ${lastError?.message}`
+        );
+        break;
+      }
 
       // Check if the request was successful and contains data
       if (!response.data || !response.data.lines_hierarchy) {
@@ -347,12 +406,79 @@ async function fetchMelbetMatches() {
     "Sec-Fetch-Site": "same-origin",
   };
 
+  // Define alternate Melbet domains to try if the main one fails
+  const melbetDomains = [
+    "melbet-india.net",
+    "melbet.com",
+    "melbet-in.com",
+    "melbet-ind.com",
+  ];
+
+  // Define alternate 1xBet domains for fetching league data
+  const onexBetDomains = [
+    "ind.1x-bet.mobi",
+    "1xbet.com",
+    "1xbet-india.com",
+    "app.1xbet.com",
+  ];
+
+  let currentMelbetDomainIndex = 0;
+  let currentOnexBetDomainIndex = 0;
+
   try {
     // First fetch to get league IDs
-    const url = `https://melbet-india.net/service-api/LineFeed/GetSportsShortZip?sports=1&lng=en&country=71&partner=8&virtualSports=true&gr=1182&groupChamps=true&tsFrom=${tsFrom}&tsTo=${tsTo}`;
-    console.log("Fetching data from URL:", url);
+    let leaguesResponse = null;
+    let retryCount = 0;
+    let lastError = null;
 
-    const leaguesResponse = await axios.get(url, { headers });
+    // Try up to 3 times with different domains for the main league list
+    while (retryCount < 3 && !leaguesResponse) {
+      try {
+        const domain = melbetDomains[currentMelbetDomainIndex];
+        const url = `https://${domain}/service-api/LineFeed/GetSportsShortZip?sports=1&lng=en&country=71&partner=8&virtualSports=true&gr=1182&groupChamps=true&tsFrom=${tsFrom}&tsTo=${tsTo}`;
+
+        console.log(
+          `Attempt ${retryCount + 1}: Fetching league data from ${domain}`
+        );
+        console.log("Fetching data from URL:", url);
+
+        leaguesResponse = await axios.get(url, {
+          headers,
+          timeout: 10000, // 10 second timeout
+        });
+
+        console.log(`Successfully fetched league data from ${domain}`);
+      } catch (error) {
+        lastError = error;
+
+        // Handle 451 error (Unavailable for Legal Reasons) or other network errors
+        if (error.response && error.response.status === 451) {
+          console.log(
+            `Domain ${melbetDomains[currentMelbetDomainIndex]} returned 451 error (geo-restricted). Trying next domain...`
+          );
+        } else {
+          console.error(
+            `Error fetching from ${melbetDomains[currentMelbetDomainIndex]}: ${error.message}`
+          );
+        }
+
+        // Try next domain
+        currentMelbetDomainIndex =
+          (currentMelbetDomainIndex + 1) % melbetDomains.length;
+        retryCount++;
+
+        // Wait before retrying
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+    }
+
+    // If all retries failed, return empty array
+    if (!leaguesResponse) {
+      console.error(
+        `All Melbet domains failed after 3 retries. Last error: ${lastError?.message}`
+      );
+      return [];
+    }
 
     // Extract league IDs
     const leagueIds = extractLeagueIds(leaguesResponse.data);
@@ -384,9 +510,48 @@ async function fetchMelbetMatches() {
       const batchPromises = batch.map(async (leagueId) => {
         try {
           console.log(`Fetching data for league ID: ${leagueId}`);
-          const leagueUrl = `https://ind.1x-bet.mobi/LineFeed/Get1x2_VZip?sports=1&champs=${leagueId}&count=50&lng=en&tf=2200000&tz=5&mode=4&country=71&partner=71&getEmpty=true&gr=35`;
 
-          const leagueResponse = await axios.get(leagueUrl, { headers });
+          let leagueResponse = null;
+          let retryCount = 0;
+
+          // Try up to 3 times with different domains for each league
+          while (retryCount < 3 && !leagueResponse) {
+            try {
+              const domain = onexBetDomains[currentOnexBetDomainIndex];
+              const leagueUrl = `https://${domain}/LineFeed/Get1x2_VZip?sports=1&champs=${leagueId}&count=50&lng=en&tf=2200000&tz=5&mode=4&country=71&partner=71&getEmpty=true&gr=35`;
+
+              leagueResponse = await axios.get(leagueUrl, {
+                headers,
+                timeout: 15000, // 15 second timeout for league data
+              });
+            } catch (error) {
+              // Handle 451 error or other network errors
+              if (error.response && error.response.status === 451) {
+                console.log(
+                  `Domain ${onexBetDomains[currentOnexBetDomainIndex]} returned 451 error. Trying next domain...`
+                );
+              } else {
+                console.error(
+                  `Error fetching league ID ${leagueId} from ${onexBetDomains[currentOnexBetDomainIndex]}: ${error.message}`
+                );
+              }
+
+              // Try next domain
+              currentOnexBetDomainIndex =
+                (currentOnexBetDomainIndex + 1) % onexBetDomains.length;
+              retryCount++;
+
+              // Wait before retrying
+              await new Promise((resolve) => setTimeout(resolve, 1500));
+            }
+          }
+
+          if (!leagueResponse) {
+            console.error(
+              `Failed to fetch data for league ID: ${leagueId} after 3 attempts`
+            );
+            return;
+          }
 
           if (
             leagueResponse.data &&
@@ -523,58 +688,125 @@ function extractLeagueIds(data) {
  * @returns {Promise<Array>} Array of matching matches
  */
 async function main() {
-  try {
-    // Fetch match data directly from APIs
-    console.log("Fetching match data from APIs...");
+  console.log("Starting match finder process...");
 
-    // Fetch data in parallel
-    const [mostbetData, melbetData] = await Promise.all([
-      fetchMostbetMatches(),
-      fetchMelbetMatches(),
-    ]);
+  const MAX_RETRIES = 2;
+  let retryCount = 0;
+  let success = false;
 
-    // Store data in memory
-    mostbetMatches = mostbetData;
-    melbetMatches = melbetData;
+  while (!success && retryCount <= MAX_RETRIES) {
+    try {
+      if (retryCount > 0) {
+        console.log(`Retry attempt ${retryCount} of ${MAX_RETRIES}...`);
+        // Add a delay between retry attempts
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
 
-    console.log(
-      `Loaded ${mostbetMatches.length} Mostbet matches and ${melbetMatches.length} Melbet matches`
-    );
+      // Fetch match data directly from APIs
+      console.log("Fetching match data from APIs...");
 
-    // Find matching matches
-    console.log("Finding matching matches...");
-    matchingMatches = findMatchingMatches(mostbetMatches, melbetMatches);
+      // Fetch data in parallel with timeouts to prevent hanging
+      console.log("Starting parallel data fetching with 2-minute timeout...");
+      const fetchTimeout = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Data fetching timeout after 2 minutes")),
+          120000
+        )
+      );
 
-    console.log(`Found ${matchingMatches.length} matching matches`);
+      const [mostbetData, melbetData] = await Promise.race([
+        Promise.all([
+          fetchMostbetMatches().catch((error) => {
+            console.error("Error in Mostbet fetch:", error.message);
+            return []; // Return empty array on error
+          }),
+          fetchMelbetMatches().catch((error) => {
+            console.error("Error in Melbet fetch:", error.message);
+            return []; // Return empty array on error
+          }),
+        ]),
+        fetchTimeout,
+      ]);
 
-    // Display a few examples
-    if (matchingMatches.length > 0) {
-      console.log("\nSample matches:");
-      const sampleCount = Math.min(5, matchingMatches.length);
+      // Check if we got any data
+      if (
+        mostbetData &&
+        mostbetData.length > 0 &&
+        melbetData &&
+        melbetData.length > 0
+      ) {
+        // Store data in memory
+        mostbetMatches = mostbetData;
+        melbetMatches = melbetData;
 
-      for (let i = 0; i < sampleCount; i++) {
-        const match = matchingMatches[i];
         console.log(
-          `\nMatch #${i + 1} (Similarity: ${
-            match.similarity.teams
-          }, Time diff: ${match.similarity.timeDifferenceMinutes} mins)`
+          `Loaded ${mostbetMatches.length} Mostbet matches and ${melbetMatches.length} Melbet matches`
         );
-        console.log(
-          `Mostbet: ${match.mostbet.home_team} vs ${
-            match.mostbet.away_team
-          } (${new Date(match.mostbet.timestamp * 1000).toISOString()})`
-        );
-        console.log(
-          `Melbet: ${match.melbet.home_team} vs ${match.melbet.away_team} (${match.melbet.date})`
-        );
+
+        // Find matching matches
+        console.log("Finding matching matches...");
+        matchingMatches = findMatchingMatches(mostbetMatches, melbetMatches);
+
+        console.log(`Found ${matchingMatches.length} matching matches`);
+
+        // If we found at least one match, consider it a success
+        if (matchingMatches.length > 0) {
+          success = true;
+
+          // Display a few examples
+          console.log("\nSample matches:");
+          const sampleCount = Math.min(5, matchingMatches.length);
+
+          for (let i = 0; i < sampleCount; i++) {
+            const match = matchingMatches[i];
+            console.log(
+              `\nMatch #${i + 1} (Similarity: ${
+                match.similarity.teams
+              }, Time diff: ${match.similarity.timeDifferenceMinutes} mins)`
+            );
+            console.log(
+              `Mostbet: ${match.mostbet.home_team} vs ${
+                match.mostbet.away_team
+              } (${new Date(match.mostbet.timestamp * 1000).toISOString()})`
+            );
+            console.log(
+              `Melbet: ${match.melbet.home_team} vs ${match.melbet.away_team} (${match.melbet.date})`
+            );
+          }
+        } else {
+          console.log("No matching matches found between the two bookmakers");
+
+          // If we didn't find matches but have data from both sources, we'll still
+          // consider it a partial success but will retry once more
+          if (retryCount < MAX_RETRIES) {
+            console.log("Will retry one more time to find matches...");
+          } else {
+            // If this was our last retry, we'll just use what we have
+            console.log("Max retries reached. Proceeding with available data.");
+            success = true;
+          }
+        }
+      } else {
+        // We didn't get data from both sources, increase retry count
+        console.log("Failed to get data from both bookmakers. Will retry.");
+        retryCount++;
+      }
+    } catch (error) {
+      console.error(
+        `Error in main function (attempt ${retryCount + 1}):`,
+        error.message
+      );
+      retryCount++;
+
+      if (retryCount > MAX_RETRIES) {
+        console.error("Max retries exceeded. Returning any available matches.");
+        // Return whatever we have at this point
+        return matchingMatches;
       }
     }
-
-    return matchingMatches;
-  } catch (error) {
-    console.error("Error in main function:", error.message);
-    return [];
   }
+
+  return matchingMatches;
 }
 
 // Export the functions and data for use in other modules
