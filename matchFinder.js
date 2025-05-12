@@ -159,29 +159,46 @@ async function fetchMostbetMatches() {
   const matches = [];
   let offset = 0;
 
-  // Define common headers to mimic a browser request
-  const headers = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    Accept: "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    Connection: "keep-alive",
-    "Cache-Control": "no-cache",
-    Pragma: "no-cache",
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-origin",
-  };
+  // Create a rotating set of user agents to appear more like regular browser traffic
+  const userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+  ];
 
-  // Define alternate Mostbet domains to try if the main one fails
+  // Define a broader set of alternate Mostbet domains to try
   const mostbetDomains = [
-    "mostbet-in62.com",
-    "mostbet.com",
+    "mostbet-uz.club",
+    "mostbet-az.xyz",
+    "mostbet-azerbaycan24.com",
+    "mostbet-azerbaijan.xyz",
+    "mostbet-sportsbook.com",
     "mostbet-india.com",
-    "mostbet-in.com",
+    "mostbet.com",
+    "mostbet-in62.com",
+    "mostbet.io",
+    "most1.bet",
+    "mostbet-br.xyz",
+    "mostbet-oynash.com",
+  ];
+
+  // Proxy configuration - free proxy options
+  // You can replace these with paid proxy services for better reliability
+  const proxyOptions = [
+    // Format: protocol://username:password@host:port (or protocol://host:port if no auth)
+    { url: null }, // No proxy (direct connection) - try first
+    { url: "http://104.227.16.86:3189" }, // Example proxy 1
+    { url: "http://103.241.205.136:3128" }, // Example proxy 2
+    { url: "http://51.159.115.233:3128" }, // Example proxy 3
+    { url: "http://187.217.54.84:80" }, // Example proxy 4
+    { url: "http://157.245.27.9:3128" }, // Example proxy 5
   ];
 
   let currentDomainIndex = 0;
+  let currentProxyIndex = 0;
+  let currentUserAgentIndex = 0;
   let successfulDomain = mostbetDomains[0]; // Default to first domain
 
   try {
@@ -193,54 +210,150 @@ async function fetchMostbetMatches() {
       let response = null;
       let lastError = null;
 
-      // Try up to 3 times with different domains if needed
-      while (retryCount < 3 && !response) {
+      // Try up to 5 times with different combinations of domains, proxies, and user agents
+      while (retryCount < 5 && !response) {
+        // Rotate through domains, proxies and user agents
+        const domain = mostbetDomains[currentDomainIndex];
+        const proxy = proxyOptions[currentProxyIndex];
+        const userAgent = userAgents[currentUserAgentIndex];
+
+        // Define common headers with rotating user agent
+        const headers = {
+          "User-Agent": userAgent,
+          Accept: "application/json, text/plain, */*",
+          "Accept-Language": "en-US,en;q=0.9",
+          Connection: "keep-alive",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+          "Sec-Fetch-Dest": "empty",
+          "Sec-Fetch-Mode": "cors",
+          "Sec-Fetch-Site": "same-origin",
+          // Add randomized headers to look more like a real browser
+          "sec-ch-ua": `"Not.A/Brand";v="8", "Chromium";v="${
+            Math.floor(Math.random() * 10) + 110
+          }", "Google Chrome";v="${Math.floor(Math.random() * 10) + 110}"`,
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"Windows"',
+          Referer: `https://${domain}/`,
+          Origin: `https://${domain}`,
+        };
+
         try {
           // Construct the API URL with the current offset and domain
-          const domain = mostbetDomains[currentDomainIndex];
           const url = `https://${domain}/api/v3/user/line/list?t[]=1&lc[]=1&um=12&ss=all&l=20&of=${offset}&ltr=0`;
 
-          console.log(`Attempt ${retryCount + 1}: Using domain ${domain}`);
+          console.log(
+            `Attempt ${retryCount + 1}: Using domain ${domain} with ${
+              proxy.url ? "proxy" : "direct connection"
+            }`
+          );
+
+          // Configure request options
+          const requestOptions = {
+            headers,
+            timeout: 20000, // 20 second timeout
+          };
+
+          // Add proxy if one is selected
+          if (proxy.url) {
+            console.log(`Using proxy: ${proxy.url}`);
+            requestOptions.proxy = {
+              host: proxy.url.split("://")[1].split(":")[0],
+              port: parseInt(proxy.url.split(":")[2]),
+              protocol: proxy.url.split("://")[0],
+            };
+          }
 
           // Fetch data from the API
-          response = await axios.get(url, {
-            headers,
-            timeout: 10000, // 10 second timeout
-          });
+          response = await axios.get(url, requestOptions);
 
           // If we get here, the request was successful
           successfulDomain = domain;
-          console.log(`Successfully fetched data from ${domain}`);
+          console.log(
+            `Successfully fetched data from ${domain}${
+              proxy.url ? " using proxy" : ""
+            }`
+          );
+
+          // Save the successful combination for future use
+          // We'll continue using this domain/proxy/agent combination as long as it works
+          break;
         } catch (error) {
           lastError = error;
 
-          // Handle 451 error (Unavailable for Legal Reasons)
+          // Handle different error scenarios
           if (error.response && error.response.status === 451) {
             console.log(
-              `Domain ${mostbetDomains[currentDomainIndex]} returned 451 error (geo-restricted). Trying next domain...`
+              `Domain ${domain} returned 451 error (geo-restricted).`
             );
-            // Try next domain
-            currentDomainIndex =
-              (currentDomainIndex + 1) % mostbetDomains.length;
+
+            // Only change proxy if we're on the last domain and we've tried a few times
+            if (retryCount % 2 === 1) {
+              // Try next proxy
+              currentProxyIndex = (currentProxyIndex + 1) % proxyOptions.length;
+              console.log(
+                `Switching to ${
+                  proxyOptions[currentProxyIndex].url
+                    ? "proxy: " + proxyOptions[currentProxyIndex].url
+                    : "direct connection"
+                }`
+              );
+            } else {
+              // Try next domain
+              currentDomainIndex =
+                (currentDomainIndex + 1) % mostbetDomains.length;
+              console.log(
+                `Switching to domain: ${mostbetDomains[currentDomainIndex]}`
+              );
+            }
+          } else if (error.code === "ECONNABORTED") {
+            console.error(`Request timed out for ${domain}`);
+            // On timeout, try a different proxy
+            currentProxyIndex = (currentProxyIndex + 1) % proxyOptions.length;
           } else {
-            console.error(
-              `Error fetching from ${mostbetDomains[currentDomainIndex]}: ${error.message}`
-            );
+            console.error(`Error fetching from ${domain}: ${error.message}`);
+            // For other errors, try different combinations
+            if (retryCount % 2 === 0) {
+              currentDomainIndex =
+                (currentDomainIndex + 1) % mostbetDomains.length;
+            } else {
+              currentProxyIndex = (currentProxyIndex + 1) % proxyOptions.length;
+            }
           }
+
+          // Always rotate user agent on error
+          currentUserAgentIndex =
+            (currentUserAgentIndex + 1) % userAgents.length;
 
           retryCount++;
 
-          // Wait before retrying to avoid overwhelming the server
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          // Add increasing delay between retries to avoid rate limiting
+          const delayMs = 2000 + retryCount * 1000;
+          console.log(`Waiting ${delayMs}ms before next attempt...`);
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
       }
 
-      // If all retries failed, break the loop
+      // If all retries failed, try to continue with any data we have
       if (!response) {
         console.error(
-          `All domains failed after 3 retries. Last error: ${lastError?.message}`
+          `Failed to fetch data after 5 retries. Last error: ${lastError?.message}`
         );
-        break;
+        console.log(
+          "Will try to continue with any data we've collected so far."
+        );
+
+        // If we haven't found any matches yet, retry once more with a longer delay
+        if (matches.length === 0 && offset === 0) {
+          console.log(
+            "No matches found yet. Will retry after a 30 second pause..."
+          );
+          await new Promise((resolve) => setTimeout(resolve, 30000));
+          continue;
+        } else {
+          // If we have some matches already or this isn't the first offset, break the loop
+          break;
+        }
       }
 
       // Check if the request was successful and contains data
@@ -270,14 +383,14 @@ async function fetchMostbetMatches() {
       offset += 20;
 
       // Add a small delay to avoid overwhelming the server
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
     console.log(`Total Mostbet matches found: ${matches.length}`);
     return matches;
   } catch (error) {
-    console.error("Error fetching Mostbet data:", error.message);
-    return [];
+    console.error("Error in fetchMostbetMatches:", error.message);
+    return matches.length > 0 ? matches : [];
   }
 }
 
@@ -390,21 +503,14 @@ async function fetchMelbetMatches() {
   );
   console.log(`Using timestamps: tsFrom=${tsFrom}, tsTo=${tsTo}`);
 
-  // Define common headers to mimic a browser request
-  const headers = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-    Accept: "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    Origin: "https://melbet-india.net",
-    Referer: "https://melbet-india.net/line/football",
-    Connection: "keep-alive",
-    "Cache-Control": "no-cache",
-    Pragma: "no-cache",
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-origin",
-  };
+  // Create a rotating set of user agents to appear more like regular browser traffic
+  const userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+  ];
 
   // Define alternate Melbet domains to try if the main one fails
   const melbetDomains = [
@@ -412,6 +518,14 @@ async function fetchMelbetMatches() {
     "melbet.com",
     "melbet-in.com",
     "melbet-ind.com",
+    "melbet.team",
+    "melbet.pk",
+    "melbet-uz.club",
+    "melbet-az.xyz",
+    "melbet.io",
+    "ml-bet.com",
+    "melbet-brazil.xyz",
+    "melbetplay.com",
   ];
 
   // Define alternate 1xBet domains for fetching league data
@@ -420,10 +534,28 @@ async function fetchMelbetMatches() {
     "1xbet.com",
     "1xbet-india.com",
     "app.1xbet.com",
+    "1x-bet.com",
+    "1xbet.io",
+    "bet-1x.com",
+    "1xstavka.ru",
+    "1xbit.com",
+  ];
+
+  // Proxy configuration - same as in fetchMostbetMatches
+  const proxyOptions = [
+    // Format: protocol://username:password@host:port (or protocol://host:port if no auth)
+    { url: null }, // No proxy (direct connection) - try first
+    { url: "http://104.227.16.86:3189" }, // Example proxy 1
+    { url: "http://103.241.205.136:3128" }, // Example proxy 2
+    { url: "http://51.159.115.233:3128" }, // Example proxy 3
+    { url: "http://187.217.54.84:80" }, // Example proxy 4
+    { url: "http://157.245.27.9:3128" }, // Example proxy 5
   ];
 
   let currentMelbetDomainIndex = 0;
   let currentOnexBetDomainIndex = 0;
+  let currentProxyIndex = 0;
+  let currentUserAgentIndex = 0;
 
   try {
     // First fetch to get league IDs
@@ -431,51 +563,126 @@ async function fetchMelbetMatches() {
     let retryCount = 0;
     let lastError = null;
 
-    // Try up to 3 times with different domains for the main league list
-    while (retryCount < 3 && !leaguesResponse) {
+    // Try up to 5 times with different domains/proxies/user agents for the main league list
+    while (retryCount < 5 && !leaguesResponse) {
+      // Rotate through domains, proxies and user agents
+      const domain = melbetDomains[currentMelbetDomainIndex];
+      const proxy = proxyOptions[currentProxyIndex];
+      const userAgent = userAgents[currentUserAgentIndex];
+
+      // Define request headers with rotating user agent
+      const headers = {
+        "User-Agent": userAgent,
+        Accept: "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        Origin: `https://${domain}`,
+        Referer: `https://${domain}/line/football`,
+        Connection: "keep-alive",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        // Add randomized headers to mimic real browsers
+        "sec-ch-ua": `"Not.A/Brand";v="8", "Chromium";v="${
+          Math.floor(Math.random() * 10) + 110
+        }", "Google Chrome";v="${Math.floor(Math.random() * 10) + 110}"`,
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+      };
+
       try {
-        const domain = melbetDomains[currentMelbetDomainIndex];
         const url = `https://${domain}/service-api/LineFeed/GetSportsShortZip?sports=1&lng=en&country=71&partner=8&virtualSports=true&gr=1182&groupChamps=true&tsFrom=${tsFrom}&tsTo=${tsTo}`;
 
         console.log(
-          `Attempt ${retryCount + 1}: Fetching league data from ${domain}`
+          `Attempt ${
+            retryCount + 1
+          }: Fetching league data from ${domain} with ${
+            proxy.url ? "proxy" : "direct connection"
+          }`
         );
         console.log("Fetching data from URL:", url);
 
-        leaguesResponse = await axios.get(url, {
+        // Configure request options
+        const requestOptions = {
           headers,
-          timeout: 10000, // 10 second timeout
-        });
+          timeout: 20000, // 20 second timeout
+        };
 
-        console.log(`Successfully fetched league data from ${domain}`);
+        // Add proxy if one is selected
+        if (proxy.url) {
+          console.log(`Using proxy: ${proxy.url}`);
+          requestOptions.proxy = {
+            host: proxy.url.split("://")[1].split(":")[0],
+            port: parseInt(proxy.url.split(":")[2]),
+            protocol: proxy.url.split("://")[0],
+          };
+        }
+
+        leaguesResponse = await axios.get(url, requestOptions);
+
+        console.log(
+          `Successfully fetched league data from ${domain}${
+            proxy.url ? " using proxy" : ""
+          }`
+        );
       } catch (error) {
         lastError = error;
 
-        // Handle 451 error (Unavailable for Legal Reasons) or other network errors
+        // Handle different error scenarios
         if (error.response && error.response.status === 451) {
-          console.log(
-            `Domain ${melbetDomains[currentMelbetDomainIndex]} returned 451 error (geo-restricted). Trying next domain...`
-          );
+          console.log(`Domain ${domain} returned 451 error (geo-restricted).`);
+
+          // Only change proxy if we're on the last domain and we've tried a few times
+          if (retryCount % 2 === 1) {
+            // Try next proxy
+            currentProxyIndex = (currentProxyIndex + 1) % proxyOptions.length;
+            console.log(
+              `Switching to ${
+                proxyOptions[currentProxyIndex].url
+                  ? "proxy: " + proxyOptions[currentProxyIndex].url
+                  : "direct connection"
+              }`
+            );
+          } else {
+            // Try next domain
+            currentMelbetDomainIndex =
+              (currentMelbetDomainIndex + 1) % melbetDomains.length;
+            console.log(
+              `Switching to domain: ${melbetDomains[currentMelbetDomainIndex]}`
+            );
+          }
+        } else if (error.code === "ECONNABORTED") {
+          console.error(`Request timed out for ${domain}`);
+          // On timeout, try a different proxy
+          currentProxyIndex = (currentProxyIndex + 1) % proxyOptions.length;
         } else {
-          console.error(
-            `Error fetching from ${melbetDomains[currentMelbetDomainIndex]}: ${error.message}`
-          );
+          console.error(`Error fetching from ${domain}: ${error.message}`);
+          // For other errors, try different combinations
+          if (retryCount % 2 === 0) {
+            currentMelbetDomainIndex =
+              (currentMelbetDomainIndex + 1) % melbetDomains.length;
+          } else {
+            currentProxyIndex = (currentProxyIndex + 1) % proxyOptions.length;
+          }
         }
 
-        // Try next domain
-        currentMelbetDomainIndex =
-          (currentMelbetDomainIndex + 1) % melbetDomains.length;
+        // Always rotate user agent on error
+        currentUserAgentIndex = (currentUserAgentIndex + 1) % userAgents.length;
+
         retryCount++;
 
-        // Wait before retrying
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Add increasing delay between retries to avoid rate limiting
+        const delayMs = 2000 + retryCount * 1000;
+        console.log(`Waiting ${delayMs}ms before next attempt...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
 
     // If all retries failed, return empty array
     if (!leaguesResponse) {
       console.error(
-        `All Melbet domains failed after 3 retries. Last error: ${lastError?.message}`
+        `All Melbet domains failed after 5 retries. Last error: ${lastError?.message}`
       );
       return [];
     }
@@ -498,6 +705,11 @@ async function fetchMelbetMatches() {
     const BATCH_SIZE = 5;
     const DELAY_BETWEEN_BATCHES = 1000; // 1 second delay between batches
 
+    // Save successful domain/proxy combinations
+    let successfulDomain = null;
+    let successfulProxy = null;
+    let successfulUserAgent = null;
+
     for (let i = 0; i < leagueIds.length; i += BATCH_SIZE) {
       const batch = leagueIds.slice(i, i + BATCH_SIZE);
       console.log(
@@ -514,41 +726,141 @@ async function fetchMelbetMatches() {
           let leagueResponse = null;
           let retryCount = 0;
 
-          // Try up to 3 times with different domains for each league
-          while (retryCount < 3 && !leagueResponse) {
+          // If we have a successful combination from previous calls, try it first
+          if (
+            successfulDomain &&
+            successfulProxy !== undefined &&
+            successfulUserAgent
+          ) {
+            currentOnexBetDomainIndex =
+              onexBetDomains.indexOf(successfulDomain);
+            if (currentOnexBetDomainIndex === -1) currentOnexBetDomainIndex = 0;
+
+            currentProxyIndex = proxyOptions.findIndex(
+              (p) => p.url === successfulProxy?.url
+            );
+            if (currentProxyIndex === -1) currentProxyIndex = 0;
+
+            currentUserAgentIndex = userAgents.indexOf(successfulUserAgent);
+            if (currentUserAgentIndex === -1) currentUserAgentIndex = 0;
+          }
+
+          // Try up to 5 times with different domains for each league
+          while (retryCount < 5 && !leagueResponse) {
+            // Get current domain, proxy and user agent
+            const domain = onexBetDomains[currentOnexBetDomainIndex];
+            const proxy = proxyOptions[currentProxyIndex];
+            const userAgent = userAgents[currentUserAgentIndex];
+
+            // Define headers with the current user agent
+            const headers = {
+              "User-Agent": userAgent,
+              Accept: "application/json, text/plain, */*",
+              "Accept-Language": "en-US,en;q=0.9",
+              Origin: `https://${domain}`,
+              Referer: `https://${domain}/sports/football`,
+              Connection: "keep-alive",
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+              "Sec-Fetch-Dest": "empty",
+              "Sec-Fetch-Mode": "cors",
+              "Sec-Fetch-Site": "same-origin",
+              // Add randomized headers
+              "sec-ch-ua": `"Not.A/Brand";v="8", "Chromium";v="${
+                Math.floor(Math.random() * 10) + 110
+              }", "Google Chrome";v="${Math.floor(Math.random() * 10) + 110}"`,
+              "sec-ch-ua-mobile": "?0",
+              "sec-ch-ua-platform": '"Windows"',
+            };
+
             try {
-              const domain = onexBetDomains[currentOnexBetDomainIndex];
               const leagueUrl = `https://${domain}/LineFeed/Get1x2_VZip?sports=1&champs=${leagueId}&count=50&lng=en&tf=2200000&tz=5&mode=4&country=71&partner=71&getEmpty=true&gr=35`;
 
-              leagueResponse = await axios.get(leagueUrl, {
+              // Configure request options
+              const requestOptions = {
                 headers,
                 timeout: 15000, // 15 second timeout for league data
-              });
-            } catch (error) {
-              // Handle 451 error or other network errors
-              if (error.response && error.response.status === 451) {
-                console.log(
-                  `Domain ${onexBetDomains[currentOnexBetDomainIndex]} returned 451 error. Trying next domain...`
-                );
-              } else {
-                console.error(
-                  `Error fetching league ID ${leagueId} from ${onexBetDomains[currentOnexBetDomainIndex]}: ${error.message}`
-                );
+              };
+
+              // Add proxy if one is selected
+              if (proxy.url) {
+                requestOptions.proxy = {
+                  host: proxy.url.split("://")[1].split(":")[0],
+                  port: parseInt(proxy.url.split(":")[2]),
+                  protocol: proxy.url.split("://")[0],
+                };
               }
 
-              // Try next domain
-              currentOnexBetDomainIndex =
-                (currentOnexBetDomainIndex + 1) % onexBetDomains.length;
+              // Log this attempt
+              console.log(
+                `League ${leagueId} - Attempt ${
+                  retryCount + 1
+                }: Using ${domain} with ${
+                  proxy.url ? "proxy" : "direct connection"
+                }`
+              );
+
+              leagueResponse = await axios.get(leagueUrl, requestOptions);
+
+              // If successful, save this combination
+              successfulDomain = domain;
+              successfulProxy = proxy;
+              successfulUserAgent = userAgent;
+
+              console.log(
+                `Successfully fetched league ID ${leagueId} from ${domain}${
+                  proxy.url ? " using proxy" : ""
+                }`
+              );
+            } catch (error) {
+              // Handle different error scenarios
+              if (error.response && error.response.status === 451) {
+                console.log(
+                  `Domain ${domain} returned 451 error for league ${leagueId}.`
+                );
+
+                // Try next domain or proxy
+                if (retryCount % 2 === 0) {
+                  currentOnexBetDomainIndex =
+                    (currentOnexBetDomainIndex + 1) % onexBetDomains.length;
+                } else {
+                  currentProxyIndex =
+                    (currentProxyIndex + 1) % proxyOptions.length;
+                }
+              } else if (error.code === "ECONNABORTED") {
+                console.error(`Request timed out for league ${leagueId}`);
+                // On timeout, try a different proxy
+                currentProxyIndex =
+                  (currentProxyIndex + 1) % proxyOptions.length;
+              } else {
+                console.error(
+                  `Error fetching league ID ${leagueId} from ${domain}: ${error.message}`
+                );
+                // For other errors, alternate between changing domains and proxies
+                if (retryCount % 2 === 0) {
+                  currentOnexBetDomainIndex =
+                    (currentOnexBetDomainIndex + 1) % onexBetDomains.length;
+                } else {
+                  currentProxyIndex =
+                    (currentProxyIndex + 1) % proxyOptions.length;
+                }
+              }
+
+              // Always rotate user agent on error
+              currentUserAgentIndex =
+                (currentUserAgentIndex + 1) % userAgents.length;
+
               retryCount++;
 
-              // Wait before retrying
-              await new Promise((resolve) => setTimeout(resolve, 1500));
+              // Add delay between retries
+              const delayMs = 1500 + retryCount * 500;
+              await new Promise((resolve) => setTimeout(resolve, delayMs));
             }
           }
 
           if (!leagueResponse) {
             console.error(
-              `Failed to fetch data for league ID: ${leagueId} after 3 attempts`
+              `Failed to fetch data for league ID: ${leagueId} after 5 attempts`
             );
             return;
           }
@@ -593,7 +905,7 @@ async function fetchMelbetMatches() {
     console.log(`Total Melbet matches found: ${allMatches.length}`);
     return allMatches;
   } catch (error) {
-    console.error("Error fetching Melbet data:", error.message);
+    console.error("Error in fetchMelbetMatches:", error.message);
     return [];
   }
 }
