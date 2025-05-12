@@ -5,6 +5,7 @@ const { fetch1xBetData } = require("./1xBet.js");
 const { fetchMostBetData } = require("./mostbet.js");
 const arbitrageFunctions = require("./arbitrage-functions.js");
 const nodemailer = require("nodemailer");
+const matchFinder = require("./matchFinder.js");
 require("dotenv").config();
 
 // Create the email transporter
@@ -27,6 +28,57 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
 // Use the persistent data directory if available (for Railway deployment)
 const dataDir = process.env.NODE_ENV === "production" ? "/data" : ".";
 
+// Store arbitrage opportunities in memory
+let allArbitrageOpportunities = [];
+
+// Track the last time data was fetched
+const lastDataFetch = {
+  matchFinder: null,
+  mostbet: null,
+  melbet: null,
+};
+
+// Time threshold for data refresh (15 minutes in milliseconds)
+const DATA_REFRESH_THRESHOLD = 15 * 60 * 1000; // 15 minutes
+
+// Function to check if data needs to be refreshed
+function isDataStale() {
+  const now = Date.now();
+  // If any of the data sources are null or older than threshold, data is stale
+  return (
+    !lastDataFetch.matchFinder ||
+    !lastDataFetch.mostbet ||
+    !lastDataFetch.melbet ||
+    now - lastDataFetch.matchFinder > DATA_REFRESH_THRESHOLD ||
+    now - lastDataFetch.mostbet > DATA_REFRESH_THRESHOLD ||
+    now - lastDataFetch.melbet > DATA_REFRESH_THRESHOLD
+  );
+}
+
+// Function to refresh all data
+async function refreshAllData() {
+  console.log(
+    "Refreshing all data sources as they are more than 15 minutes old..."
+  );
+
+  try {
+    // Run the match finder to refresh data
+    await matchFinder.runMatchFinder();
+
+    // Update last fetch timestamps
+    const now = Date.now();
+    lastDataFetch.matchFinder = now;
+    lastDataFetch.mostbet = now;
+    lastDataFetch.melbet = now;
+
+    console.log("All data successfully refreshed");
+    return true;
+  } catch (error) {
+    console.error("Error refreshing data:", error.message);
+    return false;
+  }
+}
+
 // Function to send email notifications when arbitrage opportunities are found
 async function sendArbitrageEmail(opportunity) {
   if (!transporter) {
@@ -46,21 +98,31 @@ async function sendArbitrageEmail(opportunity) {
     const opportunitiesHtml = sortedOpportunities
       .map((opp, index) => {
         return `
-        <div style="margin-bottom: 15px; padding: 10px; background-color: ${index === 0 ? "#f0f8ff" : "#f5f5f5"}; border-radius: 5px;">
+        <div style="margin-bottom: 15px; padding: 10px; background-color: ${
+          index === 0 ? "#f0f8ff" : "#f5f5f5"
+        }; border-radius: 5px;">
           <h3>Opportunity ${index + 1}: ${opp.market}</h3>
-          <p><strong>Profit Potential:</strong> ${opp.profitPercent.toFixed(2)}%</p>
-          <p><strong>Odds:</strong> ${opp.odds.map((o) => o.toFixed(2)).join(", ")}</p>
+          <p><strong>Profit Potential:</strong> ${opp.profitPercent.toFixed(
+            2
+          )}%</p>
+          <p><strong>Odds:</strong> ${opp.odds
+            .map((o) => o.toFixed(2))
+            .join(", ")}</p>
           <p><strong>Bookmakers:</strong> ${opp.bookies.join(", ")}</p>
           <p><strong>Stake Distribution:</strong></p>
           <ul>
             ${opp.stakeDistribution
               .map(
                 (stake, i) =>
-                  `<li>${opp.bookies[i]}: ${stake.toFixed(2)}% of total stake</li>`
+                  `<li>${opp.bookies[i]}: ${stake.toFixed(
+                    2
+                  )}% of total stake</li>`
               )
               .join("")}
           </ul>
-          <p><strong>Expected Return:</strong> ${opp.expectedReturn.toFixed(2)} (for 100 unit stake)</p>
+          <p><strong>Expected Return:</strong> ${opp.expectedReturn.toFixed(
+            2
+          )} (for 100 unit stake)</p>
         </div>
       `;
       })
@@ -73,11 +135,17 @@ async function sendArbitrageEmail(opportunity) {
       
       <h2>Match Details:</h2>
       <p><strong>${opportunity.homeTeam} vs ${opportunity.awayTeam}</strong></p>
-      <p><strong>Match IDs:</strong> Mostbet: ${opportunity.mostbetMatchId}, Melbet/1xBet: ${opportunity.melbet1xbetMatchId}</p>
+      <p><strong>Match IDs:</strong> Mostbet: ${
+        opportunity.mostbetMatchId
+      }, Melbet/1xBet: ${opportunity.melbet1xbetMatchId}</p>
       <p><strong>League:</strong> ${opportunity.league}</p>
-      <p><strong>Match Date:</strong> ${new Date(opportunity.date).toLocaleString()}</p>
+      <p><strong>Match Date:</strong> ${new Date(
+        opportunity.date
+      ).toLocaleString()}</p>
       
-      <h2>Arbitrage Opportunities (${opportunity.arbitrageOpportunities.length}):</h2>
+      <h2>Arbitrage Opportunities (${
+        opportunity.arbitrageOpportunities.length
+      }):</h2>
       ${opportunitiesHtml}
       
       <p><strong>⚠️ Act quickly as odds may change rapidly!</strong></p>
@@ -91,7 +159,9 @@ async function sendArbitrageEmail(opportunity) {
         process.env.NOTIFICATION_EMAIL,
         "gangireddyharshavardhan30@gmail.com",
       ].join(","),
-      subject: `Arbitrage Alert: ${opportunity.homeTeam} vs ${opportunity.awayTeam} (${sortedOpportunities[0].profitPercent.toFixed(2)}% profit)`,
+      subject: `Arbitrage Alert: ${opportunity.homeTeam} vs ${
+        opportunity.awayTeam
+      } (${sortedOpportunities[0].profitPercent.toFixed(2)}% profit)`,
       html: htmlContent,
     };
 
@@ -108,26 +178,34 @@ async function sendArbitrageEmail(opportunity) {
 // Main function to process all matching matches
 async function processAllMatches() {
   try {
-    console.log("Reading matching_matches.json...");
+    console.log("Getting matching matches...");
 
-    // Look for matching_matches.json in both the data directory and current directory
-    let matchingMatchesPath = path.join(dataDir, "matching_matches.json");
-    if (!fs.existsSync(matchingMatchesPath)) {
-      matchingMatchesPath = "matching_matches.json";
-      if (!fs.existsSync(matchingMatchesPath)) {
-        console.error("matching_matches.json not found in any directory!");
-        return;
-      }
+    // Check if data is stale and needs refreshing
+    if (isDataStale()) {
+      console.log("Data is stale (older than 15 minutes). Refreshing...");
+      await refreshAllData();
+    } else {
+      console.log(
+        "Data is fresh (less than 15 minutes old). Proceeding with current data."
+      );
     }
 
-    // Read the matching_matches.json file
-    const matchingMatchesData = fs.readFileSync(matchingMatchesPath, "utf8");
-    const matchingMatches = JSON.parse(matchingMatchesData);
+    // Check if we have matching matches in memory, if not, run the match finder
+    let matchingMatches = matchFinder.getMatchingMatches();
+    if (!matchingMatches || matchingMatches.length === 0) {
+      console.log(
+        "No matching matches found in memory, running match finder..."
+      );
+      matchingMatches = await matchFinder.runMatchFinder();
+
+      // Update timestamp since we just fetched the data
+      lastDataFetch.matchFinder = Date.now();
+    }
 
     console.log(`Found ${matchingMatches.length} matching matches to process`);
 
-    // Create an array to store all arbitrage opportunities
-    const allArbitrageOpportunities = [];
+    // Reset the array of arbitrage opportunities
+    allArbitrageOpportunities = [];
 
     // Reduce log verbosity by logging only every 5th match in detail
     const logVerbose = matchingMatches.length <= 20;
@@ -150,9 +228,7 @@ async function processAllMatches() {
 
       if (shouldLogDetailed) {
         console.log(
-          `\n[${matchNumber}/${matchingMatches.length}] Processing match: ${
-            match.mostbet.home_team
-          } vs ${match.mostbet.away_team}`
+          `\n[${matchNumber}/${matchingMatches.length}] Processing match: ${match.mostbet.home_team} vs ${match.mostbet.away_team}`
         );
         console.log(
           `Mostbet ID: ${mostbetMatchId}, Melbet/1xBet ID: ${melbet1xbetMatchId}`
@@ -168,6 +244,10 @@ async function processAllMatches() {
         if (shouldLogDetailed) console.log("Fetching odds from bookmakers...");
         const mostbetData = await fetchMostBetData(mostbetMatchId);
         const data1xbet = await fetch1xBetData(melbet1xbetMatchId);
+
+        // Update timestamps for individual data sources
+        lastDataFetch.mostbet = Date.now();
+        lastDataFetch.melbet = Date.now();
 
         if (mostbetData.success && data1xbet.success) {
           if (shouldLogDetailed)
@@ -234,6 +314,10 @@ async function processAllMatches() {
 
       console.log(`Total arbitrage opportunities found: ${totalOpportunities}`);
 
+      // Log the timestamp for reference instead of writing to file
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      console.log(`Arbitrage opportunities found at: ${timestamp}`);
+
       // Display top matches with most opportunities
       console.log("\nTop 5 matches with most arbitrage opportunities:");
 
@@ -267,8 +351,11 @@ async function processAllMatches() {
     } else {
       console.log("No arbitrage opportunities found in any of the matches");
     }
+
+    return allArbitrageOpportunities;
   } catch (error) {
     console.error("Error processing matches:", error);
+    return [];
   }
 }
 
@@ -885,5 +972,16 @@ function findArbitrageOpportunities(dataMostbet, data1xbet) {
   return arbitrageOpportunities;
 }
 
-// Execute the main function
-processAllMatches();
+// Export the functions and data for use in other modules
+module.exports = {
+  processAllMatches,
+  getArbitrageOpportunities: () => allArbitrageOpportunities,
+  findArbitrageOpportunities,
+  getLastDataFetch: () => ({ ...lastDataFetch }),
+  refreshAllData,
+};
+
+// Execute the main function if this file is run directly
+if (require.main === module) {
+  processAllMatches();
+}

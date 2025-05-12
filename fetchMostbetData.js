@@ -1,4 +1,5 @@
 const axios = require("axios");
+const fs = require("fs");
 
 /**
  * Fetches match data from Mostbet API with pagination
@@ -67,6 +68,13 @@ async function fetchMostbetData() {
 
     // Save matches to JSON file
     console.log(`Total matches found: ${allMatches.length}`);
+
+    // Write matches to file
+    fs.writeFileSync(
+      "mostbet_matches.json",
+      JSON.stringify(allMatches, null, 2)
+    );
+
     console.log("Matches saved to mostbet_matches.json");
   } catch (error) {
     console.error("Error fetching data:", error.message);

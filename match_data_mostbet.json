@@ -2,241 +2,85 @@
   "success": true,
   "site": "mostbet",
   "matchDetails": {
-    "homeTeam": "Southampton",
-    "awayTeam": "Manchester City",
+    "homeTeam": "Naftan Novopolotsk",
+    "awayTeam": "Torpedo-BelAZ",
     "league": "Premier League",
-    "matchTime": "10/5/2025, 7:30:00 pm"
+    "matchTime": "12/5/2025, 8:30:00 pm"
   },
   "odds": {
     "1X2": {
-      "W1": 14,
-      "X": 7.8,
-      "W2": 1.19
+      "W1": 6.8,
+      "X": 4.05,
+      "W2": 1.45
     },
     "Double Chance": {
-      "12": 1.09,
-      "1X": 5,
-      "X2": 1.03
-    },
-    "Asian Handicap": {
-      "Southampton (+1.25)": 2.85,
-      "Manchester City (-1.25)": 1.37,
-      "Southampton (+1.75)": 2.07,
-      "Manchester City (-1.75)": 1.67,
-      "Southampton (+2.25)": 1.7,
-      "Manchester City (-2.25)": 2.03,
-      "Southampton (+2.75)": 1.44,
-      "Manchester City (-2.75)": 2.6
-    },
-    "Asian Total": {
-      "Total Over (2.75)": 1.44,
-      "Total Under (2.75)": 2.6,
-      "Total Over (3.25)": 1.7,
-      "Total Under (3.25)": 2.03,
-      "Total Over (3.75)": 2.1,
-      "Total Under (3.75)": 1.65,
-      "Total Over (4.25)": 2.62,
-      "Total Under (4.25)": 1.43
+      "12": 1.19,
+      "1X": 2.53,
+      "X2": 1.06
     },
     "Both Teams To Score": {
-      "Yes": 1.93,
-      "No": 1.87
-    },
-    "Fouls - Total Home Team": {
-      "Total Over (9.5)": 1.65,
-      "Total Under (9.5)": 2.1,
-      "Total Over (10.5)": 2.1,
-      "Total Under (10.5)": 1.65
-    },
-    "Fouls - Total Away Team": {
-      "Total Over (7.5)": 1.8,
-      "Total Under (7.5)": 1.9,
-      "Total Over (8.5)": 2.37,
-      "Total Under (8.5)": 1.51
-    },
-    "Throw-ins - 1X2": {
-      "W1": 3.15,
-      "X": 16,
-      "W2": 1.37
-    },
-    "Throw-ins - Total": {
-      "Total Over (25.5)": 1.55,
-      "Total Under (25.5)": 2.3,
-      "Total Over (26.5)": 1.75,
-      "Total Under (26.5)": 1.96,
-      "Total Over (27.5)": 2.03,
-      "Total Under (27.5)": 1.7
-    },
-    "Throw-ins - Handicap": {
-      "Southampton (+2.5)": 2.03,
-      "Manchester City (-2.5)": 1.7,
-      "Southampton (+3.5)": 1.75,
-      "Manchester City (-3.5)": 1.96,
-      "Southampton (+4.5)": 1.55,
-      "Manchester City (-4.5)": 2.3
-    },
-    "Throw-ins - Total Home Team": {
-      "Total Over (11.5)": 1.75,
-      "Total Under (11.5)": 1.96,
-      "Total Over (12.5)": 2.2,
-      "Total Under (12.5)": 1.6
-    },
-    "Throw-ins - Total Away Team": {
-      "Total Over (14.5)": 1.7,
-      "Total Under (14.5)": 2.03,
-      "Total Over (15.5)": 2.07,
-      "Total Under (15.5)": 1.67
-    },
-    "Fouls - 1X2": {
-      "W1": 1.4,
-      "X": 11.5,
-      "W2": 3.2
-    },
-    "Corners - Handicap": {
-      "Southampton (+4.5)": 1.8,
-      "Manchester City (-4.5)": 1.9,
-      "Southampton (+5.5)": 1.54,
-      "Manchester City (-5.5)": 2.32
-    },
-    "Corners - Home Team Total": {
-      "Total Over (2.5)": 1.75,
-      "Total Under (2.5)": 1.96,
-      "Total Over (3.5)": 2.8,
-      "Total Under (3.5)": 1.38
-    },
-    "Corners - Away Team Total": {
-      "Total Over (5.5)": 1.37,
-      "Total Under (5.5)": 2.85,
-      "Total Over (6.5)": 1.62,
-      "Total Under (6.5)": 2.15,
-      "Total Over (7.5)": 2.03,
-      "Total Under (7.5)": 1.7
+      "Yes": 2.2,
+      "No": 1.65
     },
     "Handicap": {
-      "Southampton (0.0)": 10,
-      "Manchester City (0.0)": 1.06,
-      "Southampton (+1.0)": 3.9,
-      "Manchester City (-1.0)": 1.25,
-      "Southampton (+2.5)": 1.6,
-      "Manchester City (-2.5)": 2.35,
-      "Southampton (+3.0)": 1.33,
-      "Manchester City (-3.0)": 3.3,
-      "Southampton (+3.5)": 1.25,
-      "Manchester City (-3.5)": 4,
-      "Southampton (+4.0)": 1.14,
-      "Manchester City (-4.0)": 5.8,
-      "Southampton (+4.5)": 1.11,
-      "Manchester City (-4.5)": 6.9
+      "Naftan Novopolotsk (0.0)": 5.2,
+      "Torpedo-BelAZ (0.0)": 1.16,
+      "Naftan Novopolotsk (+1.0)": 2,
+      "Torpedo-BelAZ (-1.0)": 1.8,
+      "Naftan Novopolotsk (+1.5)": 1.58,
+      "Torpedo-BelAZ (-1.5)": 2.4,
+      "Naftan Novopolotsk (+2.0)": 1.25,
+      "Torpedo-BelAZ (-2.0)": 3.85,
+      "Naftan Novopolotsk (+2.5)": 1.19,
+      "Torpedo-BelAZ (-2.5)": 4.8,
+      "Naftan Novopolotsk (+3.0)": 1.08,
+      "Torpedo-BelAZ (-3.0)": 8,
+      "Naftan Novopolotsk (+3.5)": 1.06,
+      "Torpedo-BelAZ (-3.5)": 9.5
     },
     "Home Team Total": {
-      "Total Over (0.5)": 1.87,
-      "Total Under (0.5)": 1.93,
-      "Total Over (1.0)": 3.7,
-      "Total Under (1.0)": 1.28,
-      "Total Over (1.5)": 5.4,
-      "Total Under (1.5)": 1.15
+      "Total Over (0.5)": 1.93,
+      "Total Under (0.5)": 1.87,
+      "Total Over (1.0)": 3.9,
+      "Total Under (1.0)": 1.25,
+      "Total Over (1.5)": 5.7,
+      "Total Under (1.5)": 1.14
     },
     "Away Team Total": {
-      "Total Over (0.5)": 1.02,
-      "Total Under (0.5)": 16,
-      "Total Over (1.0)": 1.05,
-      "Total Under (1.0)": 10,
-      "Total Over (1.5)": 1.25,
-      "Total Under (1.5)": 3.85,
-      "Total Over (2.0)": 1.38,
-      "Total Under (2.0)": 3.05,
-      "Total Over (2.5)": 1.75,
-      "Total Under (2.5)": 2.1,
-      "Total Over (3.0)": 2.2,
-      "Total Under (3.0)": 1.67,
-      "Total Over (3.5)": 2.7,
-      "Total Under (3.5)": 1.45,
-      "Total Over (4.0)": 4.15,
-      "Total Under (4.0)": 1.23,
-      "Total Over (4.5)": 4.8,
-      "Total Under (4.5)": 1.18
+      "Total Over (0.5)": 1.14,
+      "Total Under (0.5)": 5.8,
+      "Total Over (1.0)": 1.23,
+      "Total Under (1.0)": 4.1,
+      "Total Over (1.5)": 1.75,
+      "Total Under (1.5)": 2.1,
+      "Total Over (2.0)": 2.35,
+      "Total Under (2.0)": 1.6,
+      "Total Over (2.5)": 3.05,
+      "Total Under (2.5)": 1.37,
+      "Total Over (3.0)": 5.7,
+      "Total Under (3.0)": 1.14,
+      "Total Over (3.5)": 6.8,
+      "Total Under (3.5)": 1.11
     },
     "Total": {
-      "Total Over (0.5)": 1.01,
-      "Total Under (0.5)": 21,
-      "Total Over (1.0)": 1.02,
-      "Total Under (1.0)": 15,
-      "Total Over (1.5)": 1.13,
-      "Total Under (1.5)": 5.9,
-      "Total Over (2.0)": 1.17,
-      "Total Under (2.0)": 5.1,
-      "Total Over (2.5)": 1.4,
-      "Total Under (2.5)": 3,
-      "Total Over (3.0)": 1.55,
-      "Total Under (3.0)": 2.45,
-      "Total Over (3.5)": 1.95,
-      "Total Under (3.5)": 1.88,
-      "Total Over (4.0)": 2.5,
-      "Total Under (4.0)": 1.55,
-      "Total Over (4.5)": 3,
-      "Total Under (4.5)": 1.4,
-      "Total Over (5.0)": 4.6,
-      "Total Under (5.0)": 1.2,
-      "Total Over (5.5)": 5.2,
-      "Total Under (5.5)": 1.16
-    },
-    "Corners - 1X2": {
-      "W1": 6.6,
-      "X": 16,
-      "W2": 1.12
-    },
-    "Corners - Total": {
-      "Total Over (8.5)": 1.39,
-      "Total Under (8.5)": 2.77,
-      "Total Over (9.5)": 1.77,
-      "Total Under (9.5)": 1.94,
-      "Total Over (10.5)": 2.27,
-      "Total Under (10.5)": 1.56,
-      "Total Over (11.5)": 3.05,
-      "Total Under (11.5)": 1.33
-    },
-    "Yellow Cards - 1X2": {
-      "W1": 1.65,
-      "X": 3.6,
-      "W2": 4.4
-    },
-    "Yellow Cards - Total": {
-      "Total Over (2.5)": 1.56,
-      "Total Under (2.5)": 2.27,
-      "Total Over (3.5)": 2.3,
-      "Total Under (3.5)": 1.55
-    },
-    "Yellow Cards - Home Team Total": {
-      "Over (1.5)": 1.56,
-      "Under (1.5)": 2.27,
-      "Over (2.5)": 2.7,
-      "Under (2.5)": 1.41
-    },
-    "Yellow Cards - Away Team Total": {
-      "Over (0.5)": 1.39,
-      "Under (0.5)": 2.77,
-      "Over (1.5)": 2.9,
-      "Under (1.5)": 1.36
-    },
-    "Yellow Cards - Handicap": {
-      "Southampton (1)": 2.6,
-      "Manchester City (2)": 1.44
-    },
-    "Fouls - Total": {
-      "Total Over (16.5)": 1.51,
-      "Total Under (16.5)": 2.37,
-      "Total Over (17.5)": 1.75,
-      "Total Under (17.5)": 1.96,
-      "Total Over (18.5)": 2.1,
-      "Total Under (18.5)": 1.65
-    },
-    "Fouls - Handicap": {
-      "Southampton (-3.5)": 2.32,
-      "Manchester City (+3.5)": 1.54,
-      "Southampton (-2.5)": 1.9,
-      "Manchester City (+2.5)": 1.8,
-      "Southampton (-1.5)": 1.61,
-      "Manchester City (+1.5)": 2.17
+      "Total Over (0.5)": 1.07,
+      "Total Under (0.5)": 8.5,
+      "Total Over (1.0)": 1.09,
+      "Total Under (1.0)": 7.3,
+      "Total Over (1.5)": 1.33,
+      "Total Under (1.5)": 3.3,
+      "Total Over (2.0)": 1.52,
+      "Total Under (2.0)": 2.55,
+      "Total Over (2.5)": 1.95,
+      "Total Under (2.5)": 1.75,
+      "Total Over (3.0)": 2.75,
+      "Total Under (3.0)": 1.45,
+      "Total Over (3.5)": 3.4,
+      "Total Under (3.5)": 1.32,
+      "Total Over (4.0)": 5.6,
+      "Total Under (4.0)": 1.14,
+      "Total Over (4.5)": 6.4,
+      "Total Under (4.5)": 1.12
     }
   }
 }

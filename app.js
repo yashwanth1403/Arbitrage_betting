@@ -5,6 +5,10 @@ const fs = require("fs");
 const cron = require("node-cron");
 require("dotenv").config();
 
+// Import our modules directly instead of running them as separate processes
+const matchFinder = require("./matchFinder.js");
+const processMatches = require("./process-matches.js");
+
 // Create Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,19 +16,13 @@ const PORT = process.env.PORT || 3000;
 // Track process status
 const processStatus = {
   processingMatches: false,
-  fetchingMostbet: false,
-  fetchingMelbet: false,
   findingMatches: false,
   lastRunTime: {
     processingMatches: null,
-    fetchingMostbet: null,
-    fetchingMelbet: null,
     findingMatches: null,
   },
   lastRunResult: {
     processingMatches: null,
-    fetchingMostbet: null,
-    fetchingMelbet: null,
     findingMatches: null,
   },
 };
@@ -53,170 +51,69 @@ function log(message) {
   fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
 }
 
-// Function to execute a command asynchronously
-function executeCommand(command, description) {
-  return new Promise((resolve, reject) => {
-    log(`Starting: ${description}`);
-
-    exec(command, { maxBuffer: 1024 * 1024 * 50 }, (error, stdout, stderr) => {
-      if (error) {
-        log(`Error executing ${description}: ${error.message}`);
-        return resolve({
-          success: false,
-          error: error.message,
-          stdout,
-          stderr,
-        });
-      }
-
-      if (stderr) {
-        log(`${description} stderr: ${stderr}`);
-      }
-
-      log(`${description} completed successfully`);
-      return resolve({ success: true, stdout, stderr });
-    });
-  });
-}
-
-// Helper function to properly quote paths that might contain spaces
-function quotePath(filePath) {
-  return `"${filePath}"`;
-}
-
-// Run process-matches function
-async function runProcessMatches() {
-  if (processStatus.processingMatches) {
-    log("Process matches is already running, skipping this cron execution");
-    return;
-  }
-
-  try {
-    processStatus.processingMatches = true;
-    processStatus.lastRunTime.processingMatches = new Date().toISOString();
-
-    const scriptPath = quotePath(path.join(__dirname, "process-matches.js"));
-    const result = await executeCommand(
-      `node ${scriptPath}`,
-      "Process matches (cron)"
-    );
-
-    processStatus.lastRunResult.processingMatches = {
-      success: result.success,
-      completedAt: new Date().toISOString(),
-      error: result.error,
-    };
-  } catch (error) {
-    log(`Error in cron job for process-matches: ${error.message}`);
-    processStatus.lastRunResult.processingMatches = {
-      success: false,
-      completedAt: new Date().toISOString(),
-      error: error.message,
-    };
-  } finally {
-    processStatus.processingMatches = false;
-  }
-}
-
-// Run data fetching and match finding sequence
-// async function runDataFetchingSequence() {
-//   // If any of these processes are already running, skip this execution
-//   if (
-//     processStatus.fetchingMostbet ||
-//     processStatus.fetchingMelbet ||
-//     processStatus.findingMatches
-//   ) {
-//     log(
-//       "One of the data fetching processes is already running, skipping this cron execution"
-//     );
-//     return;
-//   }
-
-//   try {
-//     log("Starting scheduled data fetching sequence");
-
-//     // 1. Fetch Mostbet data
-//     processStatus.fetchingMostbet = true;
-//     processStatus.lastRunTime.fetchingMostbet = new Date().toISOString();
-
-//     const mostbetPath = quotePath(path.join(__dirname, "fetchMostbetData.js"));
-//     const mostbetResult = await executeCommand(
-//       `node ${mostbetPath}`,
-//       "Fetch Mostbet data (cron)"
-//     );
-
-//     processStatus.lastRunResult.fetchingMostbet = {
-//       success: mostbetResult.success,
-//       completedAt: new Date().toISOString(),
-//       error: mostbetResult.error,
-//     };
-//     processStatus.fetchingMostbet = false;
-
-//     // Wait a moment before starting the next process
-//     await new Promise((resolve) => setTimeout(resolve, 5000));
-
-//     // 2. Fetch Melbet data
-//     processStatus.fetchingMelbet = true;
-//     processStatus.lastRunTime.fetchingMelbet = new Date().toISOString();
-
-//     const melbetPath = quotePath(path.join(__dirname, "fetchMelbetData.js"));
-//     const melbetResult = await executeCommand(
-//       `node ${melbetPath}`,
-//       "Fetch Melbet data (cron)"
-//     );
-
-//     processStatus.lastRunResult.fetchingMelbet = {
-//       success: melbetResult.success,
-//       completedAt: new Date().toISOString(),
-//       error: melbetResult.error,
-//     };
-//     processStatus.fetchingMelbet = false;
-
-//     // Wait a moment before starting the next process
-//     await new Promise((resolve) => setTimeout(resolve, 5000));
-
-//     // 3. Run match finder
-//     processStatus.findingMatches = true;
-//     processStatus.lastRunTime.findingMatches = new Date().toISOString();
-
-//     const matchFinderPath = quotePath(path.join(__dirname, "matchFinder.js"));
-//     const matchFinderResult = await executeCommand(
-//       `node ${matchFinderPath}`,
-//       "Match finder (cron)"
-//     );
-
-//     processStatus.lastRunResult.findingMatches = {
-//       success: matchFinderResult.success,
-//       completedAt: new Date().toISOString(),
-//       error: matchFinderResult.error,
-//     };
-//     processStatus.findingMatches = false;
-
-//     log("Scheduled data fetching sequence completed");
-//   } catch (error) {
-//     log(`Error in cron job for data fetching sequence: ${error.message}`);
-//     // Make sure all process flags are reset
-//     processStatus.fetchingMostbet = false;
-//     processStatus.fetchingMelbet = false;
-//     processStatus.findingMatches = false;
-//   }
-// }
-
 // Status endpoint
 app.get("/api/status", (req, res) => {
+  // Get the last data fetch times from process-matches
+  const lastDataFetch = processMatches.getLastDataFetch
+    ? processMatches.getLastDataFetch()
+    : {
+        matchFinder: null,
+        mostbet: null,
+        melbet: null,
+      };
+
+  // Format the timestamps for display
+  const formattedDataFetch = {
+    matchFinder: lastDataFetch.matchFinder
+      ? new Date(lastDataFetch.matchFinder).toISOString()
+      : "Never",
+    mostbet: lastDataFetch.mostbet
+      ? new Date(lastDataFetch.mostbet).toISOString()
+      : "Never",
+    melbet: lastDataFetch.melbet
+      ? new Date(lastDataFetch.melbet).toISOString()
+      : "Never",
+  };
+
+  // Calculate staleness
+  const now = Date.now();
+  const DATA_REFRESH_THRESHOLD = 15 * 60 * 1000; // 15 minutes in ms
+  const dataFreshness = {
+    matchFinder: lastDataFetch.matchFinder
+      ? now - lastDataFetch.matchFinder < DATA_REFRESH_THRESHOLD
+      : false,
+    mostbet: lastDataFetch.mostbet
+      ? now - lastDataFetch.mostbet < DATA_REFRESH_THRESHOLD
+      : false,
+    melbet: lastDataFetch.melbet
+      ? now - lastDataFetch.melbet < DATA_REFRESH_THRESHOLD
+      : false,
+  };
+
   res.json({
     status: "online",
     processes: processStatus,
     uptime: process.uptime(),
     memory: process.memoryUsage(),
     environment: process.env.NODE_ENV || "development",
+    data: {
+      matchingMatches: matchFinder.getMatchingMatches().length || 0,
+      arbitrageOpportunities:
+        processMatches.getArbitrageOpportunities().length || 0,
+      lastDataFetch: formattedDataFetch,
+      dataFreshness: dataFreshness,
+      isDataStale:
+        !dataFreshness.matchFinder ||
+        !dataFreshness.mostbet ||
+        !dataFreshness.melbet,
+    },
   });
 });
 
 // Process matches endpoint
 app.get("/api/process-matches", async (req, res) => {
   if (processStatus.processingMatches) {
-    return res.status(409).json({
+    return res.status(200).json({
       success: false,
       message: "Process matches is already running",
       startedAt: processStatus.lastRunTime.processingMatches,
@@ -227,8 +124,7 @@ app.get("/api/process-matches", async (req, res) => {
     processStatus.processingMatches = true;
     processStatus.lastRunTime.processingMatches = new Date().toISOString();
 
-    const scriptPath = quotePath(path.join(__dirname, "process-matches.js"));
-    const command = `node ${scriptPath}`;
+    console.log("DEBUG: API - Starting process-matches execution");
 
     // Start the process and immediately respond to client
     res.json({
@@ -237,16 +133,22 @@ app.get("/api/process-matches", async (req, res) => {
       startedAt: processStatus.lastRunTime.processingMatches,
     });
 
-    // Execute the command
-    const result = await executeCommand(command, "Process matches");
+    // Run the process directly instead of executing a command
+    log("Starting process-matches via API...");
+    const opportunities = await processMatches.processAllMatches();
 
     // Update status
     processStatus.lastRunResult.processingMatches = {
-      success: result.success,
+      success: true,
       completedAt: new Date().toISOString(),
-      error: result.error,
+      opportunitiesFound: opportunities.length,
     };
+    log(
+      `Process-matches completed with ${opportunities.length} opportunities found`
+    );
   } catch (error) {
+    console.log(`DEBUG: API - Exception in process-matches: ${error.message}`);
+    console.log(`DEBUG: API - Stack trace: ${error.stack}`);
     log(`Error in process-matches API: ${error.message}`);
     processStatus.lastRunResult.processingMatches = {
       success: false,
@@ -254,97 +156,8 @@ app.get("/api/process-matches", async (req, res) => {
       error: error.message,
     };
   } finally {
+    console.log("DEBUG: API - Process matches endpoint completed");
     processStatus.processingMatches = false;
-  }
-});
-
-// Fetch Mostbet data endpoint
-app.get("/api/fetch-mostbet", async (req, res) => {
-  if (processStatus.fetchingMostbet) {
-    return res.status(409).json({
-      success: false,
-      message: "Fetch Mostbet data is already running",
-      startedAt: processStatus.lastRunTime.fetchingMostbet,
-    });
-  }
-
-  try {
-    processStatus.fetchingMostbet = true;
-    processStatus.lastRunTime.fetchingMostbet = new Date().toISOString();
-
-    const scriptPath = quotePath(path.join(__dirname, "fetchMostbetData.js"));
-    const command = `node ${scriptPath}`;
-
-    // Start the process and immediately respond to client
-    res.json({
-      success: true,
-      message: "Fetch Mostbet data started",
-      startedAt: processStatus.lastRunTime.fetchingMostbet,
-    });
-
-    // Execute the command
-    const result = await executeCommand(command, "Fetch Mostbet data");
-
-    // Update status
-    processStatus.lastRunResult.fetchingMostbet = {
-      success: result.success,
-      completedAt: new Date().toISOString(),
-      error: result.error,
-    };
-  } catch (error) {
-    log(`Error in fetch-mostbet API: ${error.message}`);
-    processStatus.lastRunResult.fetchingMostbet = {
-      success: false,
-      completedAt: new Date().toISOString(),
-      error: error.message,
-    };
-  } finally {
-    processStatus.fetchingMostbet = false;
-  }
-});
-
-// Fetch Melbet data endpoint
-app.get("/api/fetch-melbet", async (req, res) => {
-  if (processStatus.fetchingMelbet) {
-    return res.status(409).json({
-      success: false,
-      message: "Fetch Melbet data is already running",
-      startedAt: processStatus.lastRunTime.fetchingMelbet,
-    });
-  }
-
-  try {
-    processStatus.fetchingMelbet = true;
-    processStatus.lastRunTime.fetchingMelbet = new Date().toISOString();
-
-    const scriptPath = quotePath(path.join(__dirname, "fetchMelbetData.js"));
-    const command = `node ${scriptPath}`;
-
-    // Start the process and immediately respond to client
-    res.json({
-      success: true,
-      message: "Fetch Melbet data started",
-      startedAt: processStatus.lastRunTime.fetchingMelbet,
-    });
-
-    // Execute the command
-    const result = await executeCommand(command, "Fetch Melbet data");
-
-    // Update status
-    processStatus.lastRunResult.fetchingMelbet = {
-      success: result.success,
-      completedAt: new Date().toISOString(),
-      error: result.error,
-    };
-  } catch (error) {
-    log(`Error in fetch-melbet API: ${error.message}`);
-    processStatus.lastRunResult.fetchingMelbet = {
-      success: false,
-      completedAt: new Date().toISOString(),
-      error: error.message,
-    };
-  } finally {
-    processStatus.fetchingMelbet = false;
   }
 });
 
@@ -362,9 +175,6 @@ app.get("/api/match-finder", async (req, res) => {
     processStatus.findingMatches = true;
     processStatus.lastRunTime.findingMatches = new Date().toISOString();
 
-    const scriptPath = quotePath(path.join(__dirname, "matchFinder.js"));
-    const command = `node ${scriptPath}`;
-
     // Start the process and immediately respond to client
     res.json({
       success: true,
@@ -372,15 +182,17 @@ app.get("/api/match-finder", async (req, res) => {
       startedAt: processStatus.lastRunTime.findingMatches,
     });
 
-    // Execute the command
-    const result = await executeCommand(command, "Match finder");
+    // Run the match finder directly instead of executing a command
+    log("Starting match finder via API...");
+    const matches = await matchFinder.runMatchFinder();
 
     // Update status
     processStatus.lastRunResult.findingMatches = {
-      success: result.success,
+      success: true,
       completedAt: new Date().toISOString(),
-      error: result.error,
+      matchesFound: matches.length,
     };
+    log(`Match finder completed with ${matches.length} matches found`);
   } catch (error) {
     log(`Error in match-finder API: ${error.message}`);
     processStatus.lastRunResult.findingMatches = {
@@ -396,18 +208,11 @@ app.get("/api/match-finder", async (req, res) => {
 // Run all processes in sequence endpoint
 app.get("/api/run-all", async (req, res) => {
   // If any process is already running, return an error
-  if (
-    processStatus.fetchingMostbet ||
-    processStatus.fetchingMelbet ||
-    processStatus.findingMatches ||
-    processStatus.processingMatches
-  ) {
+  if (processStatus.findingMatches || processStatus.processingMatches) {
     return res.status(409).json({
       success: false,
       message: "One or more processes are already running",
       currentStatus: {
-        fetchingMostbet: processStatus.fetchingMostbet,
-        fetchingMelbet: processStatus.fetchingMelbet,
         findingMatches: processStatus.findingMatches,
         processingMatches: processStatus.processingMatches,
       },
@@ -425,93 +230,68 @@ app.get("/api/run-all", async (req, res) => {
   try {
     log("Starting full process sequence");
 
-    // 1. Fetch Mostbet data
-    processStatus.fetchingMostbet = true;
-    processStatus.lastRunTime.fetchingMostbet = new Date().toISOString();
-
-    const mostbetPath = quotePath(path.join(__dirname, "fetchMostbetData.js"));
-    const mostbetResult = await executeCommand(
-      `node ${mostbetPath}`,
-      "Fetch Mostbet data"
-    );
-
-    processStatus.lastRunResult.fetchingMostbet = {
-      success: mostbetResult.success,
-      completedAt: new Date().toISOString(),
-      error: mostbetResult.error,
-    };
-    processStatus.fetchingMostbet = false;
-
-    // Wait a moment before starting the next process
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    // 2. Fetch Melbet data
-    processStatus.fetchingMelbet = true;
-    processStatus.lastRunTime.fetchingMelbet = new Date().toISOString();
-
-    const melbetPath = quotePath(path.join(__dirname, "fetchMelbetData.js"));
-    const melbetResult = await executeCommand(
-      `node ${melbetPath}`,
-      "Fetch Melbet data"
-    );
-
-    processStatus.lastRunResult.fetchingMelbet = {
-      success: melbetResult.success,
-      completedAt: new Date().toISOString(),
-      error: melbetResult.error,
-    };
-    processStatus.fetchingMelbet = false;
-
-    // Wait a moment before starting the next process
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    // 3. Run match finder
+    // 1. Run match finder
     processStatus.findingMatches = true;
     processStatus.lastRunTime.findingMatches = new Date().toISOString();
 
-    const matchFinderPath = quotePath(path.join(__dirname, "matchFinder.js"));
-    const matchFinderResult = await executeCommand(
-      `node ${matchFinderPath}`,
-      "Match finder"
-    );
+    log("Running match finder...");
+    const matches = await matchFinder.runMatchFinder();
 
     processStatus.lastRunResult.findingMatches = {
-      success: matchFinderResult.success,
+      success: true,
       completedAt: new Date().toISOString(),
-      error: matchFinderResult.error,
+      matchesFound: matches.length,
     };
     processStatus.findingMatches = false;
+    log(`Match finder completed with ${matches.length} matches found`);
 
     // Wait a moment before starting the next process
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
-    // 4. Process matches
+    // 2. Process matches
     processStatus.processingMatches = true;
     processStatus.lastRunTime.processingMatches = new Date().toISOString();
 
-    const processMatchesPath = quotePath(
-      path.join(__dirname, "process-matches.js")
-    );
-    const processResult = await executeCommand(
-      `node ${processMatchesPath}`,
-      "Process matches"
-    );
+    log("Running process-matches...");
+    const opportunities = await processMatches.processAllMatches();
 
     processStatus.lastRunResult.processingMatches = {
-      success: processResult.success,
+      success: true,
       completedAt: new Date().toISOString(),
-      error: processResult.error,
+      opportunitiesFound: opportunities.length,
     };
     processStatus.processingMatches = false;
+    log(
+      `Process-matches completed with ${opportunities.length} opportunities found`
+    );
 
     log("Full process sequence completed");
   } catch (error) {
     log(`Error in run-all sequence: ${error.message}`);
     // Make sure all process flags are reset
-    processStatus.fetchingMostbet = false;
-    processStatus.fetchingMelbet = false;
     processStatus.findingMatches = false;
     processStatus.processingMatches = false;
+  }
+});
+
+// Add a new endpoint to refresh all data
+app.get("/api/refresh-data", async (req, res) => {
+  try {
+    log("Manual data refresh requested");
+
+    // Start the process and immediately respond to client
+    res.json({
+      success: true,
+      message: "Data refresh started",
+      startedAt: new Date().toISOString(),
+    });
+
+    // Run the refresh function
+    const success = await processMatches.refreshAllData();
+
+    log(`Manual data refresh ${success ? "completed successfully" : "failed"}`);
+  } catch (error) {
+    log(`Error in manual data refresh: ${error.message}`);
   }
 });
 
@@ -534,16 +314,6 @@ app.get("/", (req, res) => {
       },
       {
         method: "GET",
-        path: "/api/fetch-mostbet",
-        description: "Run the fetch Mostbet data job",
-      },
-      {
-        method: "GET",
-        path: "/api/fetch-melbet",
-        description: "Run the fetch Melbet data job",
-      },
-      {
-        method: "GET",
         path: "/api/match-finder",
         description: "Run the match finder job",
       },
@@ -551,6 +321,11 @@ app.get("/", (req, res) => {
         method: "GET",
         path: "/api/run-all",
         description: "Run all jobs in sequence",
+      },
+      {
+        method: "GET",
+        path: "/api/refresh-data",
+        description: "Manually refresh all data sources",
       },
       { method: "GET", path: "/health", description: "Health check endpoint" },
     ],
